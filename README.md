@@ -7,4 +7,5 @@
 4. UI is buttery **smooth**, **clean** and **elegent**
 5. Privacy first (stores all your data in the browser as in a cookie form)
 6. *And many more features still on the way*
-<img width="1703" height="1011" alt="image" src="https://github.com/user-attachments/assets/965231fe-4730-4bff-a826-5e970994cd60" />
+--
+<img width="1708" height="1000" alt="image" src="https://github.com/user-attachments/assets/ec6573b6-bde5-4864-bb47-a532c992d5b2" />
