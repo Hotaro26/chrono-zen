@@ -1,5 +1,6 @@
+<p align="center">
 <img width="250" height="250" alt="image" src="https://github.com/user-attachments/assets/cd88dfe4-8241-4cb7-b6b9-190c24bd6db8" />
-
+</p>
 
 # Chrono Timer
 ## URL: https://chrono-timer-five.vercel.app/
