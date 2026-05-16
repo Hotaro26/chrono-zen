@@ -13,7 +13,6 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from 'framer-motion';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Separator } from '@/components/ui/separator';
 
 interface TodoListProps {
@@ -34,13 +33,13 @@ const todoItemVariants = {
 
 const TodoItem = ({ todo, onToggleTodo, onSetEditingTodo, onSetDeletingTodo }: { todo: Todo, onToggleTodo: (id: string) => void, onSetEditingTodo: (todo: Todo) => void, onSetDeletingTodo: (todo: Todo) => void }) => (
   <motion.div
-    layoutId={`todo-item-${todo.id}`}
+    layout
     variants={todoItemVariants}
     initial="initial"
     animate="animate"
     exit="exit"
     transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-    className="flex items-center space-x-4 p-3 rounded-lg bg-transparent border transition-all hover:bg-accent/50"
+    className={`flex items-center space-x-4 p-3 rounded-lg bg-transparent border transition-all hover:bg-accent/50 ${todo.completed ? 'opacity-70' : ''}`}
   >
     <Checkbox
       id={todo.id}
@@ -143,51 +142,53 @@ const TodoList: React.FC<TodoListProps> = ({ todos, onAddTodo, onToggleTodo, onD
           </DialogContent>
         </Dialog>
       </CardHeader>
-      <CardContent className="flex-grow p-0">
-        <ScrollArea className="h-96 pr-6">
-          <div className="space-y-4 p-6 pt-0">
-            <div className="space-y-2">
-              <AnimatePresence>
-                {pending.length > 0 ? (
-                  pending.map((todo) => (
-                    <TodoItem key={todo.id} todo={todo} onToggleTodo={onToggleTodo} onSetEditingTodo={setEditingTodo} onSetDeletingTodo={setDeletingTodo} />
-                  ))
-                ) : (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-center py-10 text-foreground/50"
-                  >
-                    <Check className="mx-auto h-12 w-12" />
-                    <p className="mt-4">You're all caught up!</p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {completed.length > 0 && (
-              <Collapsible defaultOpen={true} className="pt-4">
-                 <div className="flex items-center justify-between">
-                    <Separator className="flex-1" />
-                    <CollapsibleTrigger asChild>
-                       <Button variant="ghost" size="sm" className="mx-4">
-                          <h3 className="text-sm font-medium text-foreground/60">Completed</h3>
-                          <ChevronsUpDown className="h-4 w-4 ml-2" />
-                       </Button>
-                    </CollapsibleTrigger>
-                    <Separator className="flex-1" />
-                 </div>
-                <CollapsibleContent className="space-y-2 mt-4">
-                  <AnimatePresence>
-                    {completed.map((todo) => (
-                       <TodoItem key={todo.id} todo={todo} onToggleTodo={onToggleTodo} onSetEditingTodo={setEditingTodo} onSetDeletingTodo={setDeletingTodo} />
-                    ))}
-                  </AnimatePresence>
-                </CollapsibleContent>
-              </Collapsible>
-            )}
+      <CardContent className="flex-grow p-0 overflow-hidden flex flex-col">
+        <ScrollArea className="flex-grow p-6">
+          <div className="space-y-4">
+            <AnimatePresence>
+              {pending.length > 0 ? (
+                pending.map((todo) => (
+                  <TodoItem key={todo.id} todo={todo} onToggleTodo={onToggleTodo} onSetEditingTodo={setEditingTodo} onSetDeletingTodo={setDeletingTodo} />
+                ))
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-center py-10 text-foreground/50"
+                >
+                  <Check className="mx-auto h-12 w-12" />
+                  <p className="mt-4">You're all caught up!</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </ScrollArea>
+        {completed.length > 0 && (
+          <div className="p-6 bg-card/50">
+            <Dialog>
+              <DialogTrigger asChild>
+                <div className="flex items-center justify-between cursor-pointer">
+                  <Separator className="flex-1" />
+                  <Button variant="ghost" size="sm" className="mx-4">
+                    <h3 className="text-sm font-medium text-foreground/60">Completed</h3>
+                    <ChevronsUpDown className="h-4 w-4 ml-2" />
+                  </Button>
+                  <Separator className="flex-1" />
+                </div>
+              </DialogTrigger>
+              <DialogContent className="bg-background/80 backdrop-blur-md max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Completed Tasks</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-2 mt-4">
+                  {completed.map((todo) => (
+                    <TodoItem key={todo.id} todo={todo} onToggleTodo={onToggleTodo} onSetEditingTodo={setEditingTodo} onSetDeletingTodo={setDeletingTodo} />
+                  ))}
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        )}
       </CardContent>
 
       {/* Edit Dialog */}

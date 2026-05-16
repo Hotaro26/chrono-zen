@@ -7,16 +7,16 @@ import { Moon, Sun } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 const ThemeSwitcher = () => {
-  const [theme, setTheme] = useState('dark');
+  const [theme, setTheme] = useState<string | null>(null);
 
   useEffect(() => {
     const storedTheme = localStorage.getItem("theme");
     const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    const initialTheme = storedTheme || systemTheme;
-    setTheme(initialTheme);
+    setTheme(storedTheme || systemTheme);
   }, []);
 
   useEffect(() => {
+    if (theme === null) return;
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
       document.documentElement.classList.remove('light');

@@ -53,8 +53,7 @@
 @layer base {
   * {
     @apply border-border;
-  }
-  body {
+  }  body {
     @apply bg-background text-foreground;
   }
   /* Hide spinner buttons on number inputs */

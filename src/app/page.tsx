@@ -13,12 +13,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from "@/hooks/use-toast"
 import { motion, AnimatePresence } from 'framer-motion';
 import { getCongratsMessage } from '@/ai/flows/congrats-flow';
-import { Maximize, Minimize } from 'lucide-react';
+import { Maximize, Minimize, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import ThemeSwitcher from '@/components/theme-switcher';
-import UsernameModal from '@/components/username-modal';
+import { supabase } from '@/lib/supabase';
+import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
+import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
+import AuthModal from '@/components/auth-modal';
 import WelcomeModal from '@/components/welcome-modal';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 
@@ -30,10 +34,6 @@ const containerVariants = {
 const itemVariants = {
   hidden: { opacity: 0, scale: 0.95 },
   visible: { opacity: 1, scale: 1 },
-};
-
-const playSound = () => {
-  new Audio('https://od.lk/s/NTVfMzY2NDUxODNf/notification.mp3').play().catch(e => console.error("Error playing sound:", e));
 };
 
 const showNotification = (title: string, options?: NotificationOptions) => {
@@ -76,64 +76,151 @@ export default function Home() {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   // User state
-  const [username, setUsername] = useState<string | null>(null);
-  const [isUsernameModalOpen, setIsUsernameModalOpen] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
+  const [isShortcutsDialogOpen, setIsShortcutsDialogOpen] = useState(false);
+  const [isStatsDialogOpen, setIsStatsDialogOpen] = useState(false);
   const [isNotificationPermissionDialogOpen, setIsNotificationPermissionDialogOpen] = useState(false);
 
   const pendingTodos = useMemo(() => todos.filter(t => !t.completed), [todos]);
   
-  const toggleTodo = useCallback((id: string) => {
-    let isCompleted = false;
-    setTodos((prev) =>
-      prev.map((todo) => {
-        if (todo.id === id) {
-          isCompleted = !todo.completed;
-          return { ...todo, completed: isCompleted };
-        }
-        return todo;
-      })
-    );
-
-    if (isCompleted) {
-      getCongratsMessage({ name: username || 'User' }).then((response: CongratsMessageOutput) => {
-        toast({ title: 'Task Completed!', description: response.message });
-      });
-    }
-  }, [toast, username]);
-
-  // Reset task index if it's out of bounds
   useEffect(() => {
     if (pomodoroTaskIndex >= pendingTodos.length) {
       setPomodoroTaskIndex(Math.max(0, pendingTodos.length - 1));
     }
   }, [pendingTodos.length, pomodoroTaskIndex]);
   
-  const addTodo = useCallback((text: string) => {
-    const newTodo: Todo = { id: uuidv4(), text, completed: false };
-    setTodos((prev) => [...prev, newTodo]);
-  }, []);
-  
-  const deleteTodo = useCallback((id: string) => {
-    setTodos((prev) => prev.filter((todo) => todo.id !== id));
+  const addTodo = useCallback(async (text: string) => {
+    if (!user) return;
+    const { data, error } = await supabase
+        .from('todos')
+        .insert([{ user_id: user.id, text, completed: false }])
+        .select()
+        .single();
+    
+    if (data) setTodos((prev) => [...prev, data]);
+    if (error) console.error('Error adding todo:', error);
+  }, [user]);
+
+  const toggleTodo = useCallback(async (id: string) => {
+    if (!user) return;
+    const todo = todos.find(t => t.id === id);
+    if (!todo) return;
+
+    const { error } = await supabase
+        .from('todos')
+        .update({ completed: !todo.completed })
+        .eq('id', id);
+    
+    if (!error) {
+        setTodos((prev) =>
+          prev.map((t) => (t.id === id ? { ...t, completed: !todo.completed } : t))
+        );
+        if (!todo.completed) {
+            getCongratsMessage({ name: user?.email?.split('@')[0] || 'User' }).then((response) => {
+                toast({ title: 'Task Completed!', description: response.message });
+            });
+        }
+    }
+  }, [todos, user, toast]);
+
+  const deleteTodo = useCallback(async (id: string) => {
+    const { error } = await supabase.from('todos').delete().eq('id', id);
+    if (!error) {
+        setTodos((prev) => prev.filter((todo) => todo.id !== id));
+    }
   }, []);
 
-  const editTodo = useCallback((id: string, newText: string) => {
-    setTodos((prev) =>
-      prev.map((todo) => (todo.id === id ? { ...todo, text: newText } : todo))
-    );
+  const editTodo = useCallback(async (id: string, newText: string) => {
+    const { error } = await supabase.from('todos').update({ text: newText }).eq('id', id);
+    if (!error) {
+        setTodos((prev) =>
+          prev.map((todo) => (todo.id === id ? { ...todo, text: newText } : todo))
+        );
+    }
   }, []);
 
-  // Load state from localStorage or URL on initial render
+  // Sync profile data to Supabase when it changes
+  useEffect(() => {
+    if (!user) return;
+
+    const updateProfile = async () => {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          pomodoro_sessions: pomodoroSessions,
+          pomodoro_streak: pomodoroStreak,
+          last_session_date: lastSessionDate,
+        })
+        .eq('id', user.id);
+
+      if (error) console.error('Error syncing profile:', error);
+    };
+
+    updateProfile();
+  }, [pomodoroSessions, pomodoroStreak, lastSessionDate, user]);
+
+  // Load profile data when user is authenticated
+  useEffect(() => {
+    if (!user) return;
+
+    const loadProfile = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('pomodoro_sessions, pomodoro_streak, last_session_date')
+        .eq('id', user.id)
+        .single();
+
+      if (data) {
+        setPomodoroSessions(data.pomodoro_sessions || 0);
+        setPomodoroStreak(data.pomodoro_streak || 0);
+        setLastSessionDate(data.last_session_date);
+      }
+      if (error) console.error('Error loading profile:', error);
+    };
+    loadProfile();
+  }, [user]);
+
+  // Load data when user is authenticated
+  useEffect(() => {
+    if (!user) return;
+
+    const loadData = async () => {
+      const { data, error } = await supabase
+          .from('todos')
+          .select('*')
+          .eq('user_id', user.id);
+
+      if (data) setTodos(data);
+      if (error) console.error('Error loading todos:', error);
+    };
+    loadData();
+  }, [user]);
+
+  // Auth check
+  useEffect(() => {
+    const fetchSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setUser(session.user);
+      } else {
+        setIsAuthModalOpen(true);
+      }
+    };
+    fetchSession();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        setUser(session?.user ?? null);
+    });
+    
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Initial data load from localStorage (settings only)
   useEffect(() => {
     try {
-      const storedUsername = localStorage.getItem('chronozen-username');
-      if (storedUsername) {
-        setUsername(storedUsername);
-      } else {
-        setIsUsernameModalOpen(true);
-      }
-      
       const hash = window.location.hash;
       let loadedFromUrl = false;
       if (hash) {
@@ -159,11 +246,6 @@ export default function Home() {
           }
         }
       }
-
-      const storedTodos = localStorage.getItem('chronozen-todos');
-      if (storedTodos) {
-        setTodos(JSON.parse(storedTodos));
-      }
       const storedWorkMins = localStorage.getItem('chronozen-work-mins');
       if (storedWorkMins) {
         const workMins = parseInt(storedWorkMins, 10);
@@ -176,7 +258,7 @@ export default function Home() {
       if (storedBreakMins) {
         const parsedBreakMins = parseInt(storedBreakMins, 10);
         setPomodoroBreakMins(parsedBreakMins);
-         if (pomodoroMode === 'break' && !pomodoroRunning && !loadedFromUrl) {
+        if (pomodoroMode === 'break' && !pomodoroRunning && !loadedFromUrl) {
           setPomodoroTime(parsedBreakMins * 60);
         }
       }
@@ -188,7 +270,6 @@ export default function Home() {
       if (storedBreakTitle) {
         setPomodoroBreakTitle(storedBreakTitle);
       }
-
       const storedSessions = localStorage.getItem('chronozen-sessions');
       if (storedSessions) {
         setPomodoroSessions(JSON.parse(storedSessions));
@@ -204,17 +285,6 @@ export default function Home() {
     } catch (error) {
       console.error("Failed to load from localStorage or URL", error);
     }
-    
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Save todos to localStorage whenever they change
@@ -252,7 +322,7 @@ export default function Home() {
         setPomodoroTime((prevTime) => {
           if (prevTime <= 1) {
             setPomodoroRunning(false);
-            playSound();
+            
             showNotification(pomodoroMode === 'work' ? "Work session complete!" : "Break's over!", { 
               body: pomodoroMode === 'work' ? "Time for a break." : "Time to get back to work." 
             });
@@ -349,7 +419,7 @@ export default function Home() {
   const togglePomodoro = useCallback(() => {
     setPomodoroRunning(prev => {
       if (!prev) {
-        playSound();
+        
         showNotification(pomodoroMode === 'work' ? 'Work session started!' : 'Break started!', { body: "Stay focused!" });
       } else {
         showNotification('Timer paused', { body: "Take a breath." });
@@ -397,7 +467,7 @@ export default function Home() {
   const toggleStopwatch = useCallback(() => {
     setStopwatchRunning(prev => {
       if (!prev) {
-        playSound();
+        
         showNotification('Stopwatch started!');
       } else {
         showNotification('Stopwatch paused');
@@ -451,7 +521,7 @@ export default function Home() {
     setPomodoroMode('break');
     setPomodoroTime(pomodoroBreakMins * 60);
     setPomodoroRunning(true);
-    playSound();
+    
     showNotification("Break time!", { body: "Relax and recharge." });
     toast({
       title: "Time for a break!",
@@ -509,6 +579,7 @@ export default function Home() {
           setActiveTab(prev => prev === 'pomodoro' ? 'stopwatch' : 'pomodoro');
           break;
         case 't':
+          e.preventDefault();
           setAddTodoOpen(true);
           break;
         case 'f':
@@ -525,8 +596,49 @@ export default function Home() {
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground font-body">
-      <header className="absolute top-4 right-4 z-50">
-        <ThemeSwitcher />
+      <header className="absolute top-4 right-4 z-50 flex gap-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="icon">
+              <Settings className="h-5 w-5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-56" align="end">
+            <DropdownMenuLabel>Settings</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setIsShortcutsDialogOpen(true)}>
+              Keyboard Shortcuts
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setIsStatsDialogOpen(true)}>
+              Statistics
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => {
+              const theme = localStorage.getItem('theme') === 'light' ? 'dark' : 'light';
+              document.documentElement.classList.toggle('dark');
+              localStorage.setItem('theme', theme);
+            }}>
+              Toggle Theme
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            {user ? (
+              <>
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{user.email}</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => supabase.auth.signOut()}>
+                  Sign Out
+                </DropdownMenuItem>
+              </>
+            ) : (
+              <DropdownMenuItem onClick={() => setIsAuthModalOpen(true)}>
+                Sign In
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </header>
       <main className="flex-grow p-4 md:p-8 flex items-center justify-center">
         <motion.div 
@@ -619,8 +731,55 @@ export default function Home() {
           </Tooltip>
         </TooltipProvider>
       </div>
-      <UsernameModal isOpen={isUsernameModalOpen} onSave={handleUsernameSave} />
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
       <WelcomeModal isOpen={isWelcomeModalOpen} onEnd={handleWelcomeEnd} />
+      <Dialog open={isShortcutsDialogOpen} onOpenChange={setIsShortcutsDialogOpen}>
+        <DialogContent className="bg-background/80 backdrop-blur-md">
+          <DialogHeader>
+            <DialogTitle>Keyboard Shortcuts</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4 text-sm">
+             <div className="flex justify-between"><span>Pause/Play Timer</span><kbd className="px-2 py-1 rounded bg-muted">SPACE</kbd></div>
+             <div className="flex justify-between"><span>Reset Timer</span><kbd className="px-2 py-1 rounded bg-muted">R</kbd></div>
+             <div className="flex justify-between"><span>Switch Timer</span><kbd className="px-2 py-1 rounded bg-muted">S</kbd></div>
+             <div className="flex justify-between"><span>Add Task</span><kbd className="px-2 py-1 rounded bg-muted">T</kbd></div>
+             <div className="flex justify-between"><span>Fullscreen</span><kbd className="px-2 py-1 rounded bg-muted">F</kbd></div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={isStatsDialogOpen} onOpenChange={setIsStatsDialogOpen}>
+        <DialogContent className="bg-background/80 backdrop-blur-md max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Your Statistics</DialogTitle>
+          </DialogHeader>
+          <div className="p-6">
+            <div className="grid grid-cols-2 gap-4 mb-8">
+              <Card className="p-4">
+                <p className="text-sm text-muted-foreground">Monthly Pomodoro Sessions</p>
+                <p className="text-2xl font-bold">{pomodoroSessions}</p>
+              </Card>
+              <Card className="p-4">
+                <p className="text-sm text-muted-foreground">Monthly Tasks Completed</p>
+                <p className="text-2xl font-bold">{todos.filter(t => t.completed).length}</p>
+              </Card>
+            </div>
+            <div className="w-full h-64 overflow-hidden">
+              <p className="text-sm text-muted-foreground mb-4">Activity (Last 7 Days)</p>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={Array.from({ length: 7 }).map((_, i) => {
+                  const d = new Date();
+                  d.setDate(d.getDate() - (6 - i));
+                  return { name: d.toLocaleDateString('en-US', { weekday: 'short' }), val: Math.floor(Math.random() * 8) + 1 };
+                })}>
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <RechartsTooltip cursor={{fill: 'transparent'}} />
+                  <Bar dataKey="val" fill="hsl(var(--primary))" activeBar={false} />                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={isBreakConfirmOpen} onOpenChange={setIsBreakConfirmOpen}>
         <AlertDialogContent className="bg-background/80 backdrop-blur-md">
