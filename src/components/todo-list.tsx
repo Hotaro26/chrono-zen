@@ -181,6 +181,14 @@ const TodoList: React.FC<TodoListProps> = ({ todos, onAddTodo, onToggleTodo, onD
                   <DialogTitle>Completed Tasks</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-2 mt-4">
+                  <div className="flex justify-end mb-2">
+                    <Button variant="ghost" size="sm" className="text-destructive" onClick={() => {
+                        todos.filter(t => t.completed).forEach(t => onDeleteTodo(t.id));
+                        toast({ title: 'Tasks Cleared', description: 'All completed tasks have been removed.' });
+                    }}>
+                        Clear All
+                    </Button>
+                  </div>
                   {completed.map((todo) => (
                     <TodoItem key={todo.id} todo={todo} onToggleTodo={onToggleTodo} onSetEditingTodo={setEditingTodo} onSetDeletingTodo={setDeletingTodo} />
                   ))}

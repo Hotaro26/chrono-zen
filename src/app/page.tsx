@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import TodoList from '@/components/todo-list';
 import Pomodoro from '@/components/pomodoro';
 import Stopwatch from '@/components/stopwatch';
-import type { Todo, Sticker, CongratsMessageOutput } from '@/lib/types';
-import { motion, AnimatePresence, useDragControls } from 'framer-motion';
-import { Maximize, Minimize, Settings, Lock, Unlock, PlusCircle, Trash2, Palette, Keyboard, BarChart3, Moon } from 'lucide-react';
+import type { Todo, Sticker } from '@/lib/types';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Maximize, Minimize, Settings, Lock, Unlock, PlusCircle, Trash2, Palette, Keyboard, BarChart3, Moon, Clock } from 'lucide-react';
 import { formatTime } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -49,7 +49,9 @@ const showNotification = (title: string, options?: NotificationOptions) => {
 
 export default function Home() {
   const { toast } = useToast();
-  
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const sparksRef = useRef<any[]>([]);
+
   // To-Do State
   const [todos, setTodos] = useState<Todo[]>([]);
   const [pomodoroTaskIndex, setPomodoroTaskIndex] = useState(-1);
@@ -59,60 +61,13 @@ export default function Home() {
   const [stickers, setStickers] = useState<Sticker[]>([]);
   const [isEditMode, setIsEditMode] = useState(false);
   const [newStickerUrl, setNewStickerUrl] = useState('');
-  
+
   // Background State
   const [background, setBackground] = useState<string>('');
   const [dimness, setDimness] = useState<number>(50);
   const [blurEnabled, setBlurEnabled] = useState<boolean>(false);
+  const [isSparkEnabled, setIsSparkEnabled] = useState<boolean>(true);
   const [isBackgroundModalOpen, setIsBackgroundModalOpen] = useState(false);
-
-  useEffect(() => {
-    const savedBackground = localStorage.getItem('chronozen-background');
-    const savedDimness = localStorage.getItem('chronozen-dimness');
-    const savedBlur = localStorage.getItem('chronozen-blur');
-    if (savedBackground) setBackground(savedBackground);
-    if (savedDimness) setDimness(Number(savedDimness));
-    if (savedBlur !== null) setBlurEnabled(JSON.parse(savedBlur));
-  }, []);
-
-  const updateBackgroundSettings = (updates: Partial<{url: string, dim: number, blur: boolean}>) => {
-    if (updates.url !== undefined) {
-        setBackground(updates.url);
-        localStorage.setItem('chronozen-background', updates.url);
-    }
-    if (updates.dim !== undefined) {
-        setDimness(updates.dim);
-        localStorage.setItem('chronozen-dimness', String(updates.dim));
-    }
-    if (updates.blur !== undefined) {
-        setBlurEnabled(updates.blur);
-        localStorage.setItem('chronozen-blur', JSON.stringify(updates.blur));
-    }
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        updateBackgroundSettings({ url: reader.result as string });
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const addSticker = () => {
-    if (newStickerUrl) {
-      setStickers([...stickers, { id: uuidv4(), url: newStickerUrl, x: 50, y: 50, size: 96 }]);
-      setNewStickerUrl('');
-    }
-  };
-
-  const updateSticker = (id: string, updates: Partial<Sticker>) => {
-    setStickers(stickers.map(s => s.id === id ? { ...s, ...updates } : s));
-  };
-
-  const removeSticker = (id: string) => setStickers(stickers.filter(s => s.id !== id));
 
   // Pomodoro State
   const [pomodoroWorkMins, setPomodoroWorkMins] = useState(25);
@@ -141,6 +96,117 @@ export default function Home() {
   const [isShortcutsDialogOpen, setIsShortcutsDialogOpen] = useState(false);
   const [isStatsDialogOpen, setIsStatsDialogOpen] = useState(false);
   const [isNotificationPermissionDialogOpen, setIsNotificationPermissionDialogOpen] = useState(false);
+
+  useEffect(() => {
+    const canvas = document.createElement('canvas');
+    canvas.style.position = 'fixed';
+    canvas.style.top = '0';
+    canvas.style.left = '0';
+    canvas.style.pointerEvents = 'none';
+    canvas.style.zIndex = '9999';
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    document.body.appendChild(canvas);
+
+    const ctx = canvas.getContext('2d')!;
+
+    const draw = (timestamp: number) => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      sparksRef.current = sparksRef.current.filter((spark) => {
+        const elapsed = timestamp - spark.startTime;
+        const progress = Math.min(elapsed / 400, 1);
+        const easeOut = 1 - Math.pow(1 - progress, 3);
+        const distance = easeOut * 10;
+        const opacity = progress < 0.5 ? progress * 2 : 1 - (progress - 0.5) * 2;
+        if (progress < 1) {
+          const x = spark.x + Math.cos(spark.angle) * distance;
+          const y = spark.y + Math.sin(spark.angle) * distance;
+          ctx.beginPath();
+          ctx.strokeStyle = spark.color;
+          ctx.globalAlpha = opacity;
+          ctx.lineWidth = 1.5;
+          ctx.moveTo(x, y);
+          ctx.lineTo(x + Math.cos(spark.angle) * 5, y + Math.sin(spark.angle) * 5);
+          ctx.stroke();
+          ctx.globalAlpha = 1.0;
+          return true;
+        }
+        return false;
+      });
+      if (sparksRef.current.length > 0) requestAnimationFrame(draw);
+    };
+
+    const handleClick = (e: MouseEvent) => {
+      if (!isSparkEnabled) return;
+      const now = performance.now();
+      const isDark = document.documentElement.classList.contains('dark');
+      const sparkColor = isDark ? '#ffffff' : '#000000';
+      for (let i = 0; i < 8; i++) {
+        sparksRef.current.push({
+          x: e.clientX,
+          y: e.clientY,
+          angle: (Math.PI * 2 * i) / 8 + Math.random() * 0.2,
+          startTime: now,
+          color: sparkColor,
+        });
+      }
+      requestAnimationFrame(draw);
+    };
+
+    window.addEventListener('click', handleClick);
+    window.addEventListener('resize', () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    });
+
+    return () => {
+      window.removeEventListener('click', handleClick);
+      document.body.removeChild(canvas);
+    };
+  }, [isSparkEnabled]);
+
+  useEffect(() => {
+    const savedBackground = localStorage.getItem('chronozen-background');
+    const savedDimness = localStorage.getItem('chronozen-dimness');
+    const savedBlur = localStorage.getItem('chronozen-blur');
+    const savedSpark = localStorage.getItem('chronozen-spark');
+    if (savedBackground) setBackground(savedBackground);
+    if (savedDimness) setDimness(Number(savedDimness));
+    if (savedBlur !== null) setBlurEnabled(JSON.parse(savedBlur));
+    if (savedSpark !== null) setIsSparkEnabled(JSON.parse(savedSpark));
+  }, []);
+
+  const updateSettings = (updates: Partial<{url: string, dim: number, blur: boolean, spark: boolean}>) => {
+    if (updates.url !== undefined) {
+        setBackground(updates.url);
+        localStorage.setItem('chronozen-background', updates.url);
+    }
+    if (updates.dim !== undefined) {
+        setDimness(updates.dim);
+        localStorage.setItem('chronozen-dimness', String(updates.dim));
+    }
+    if (updates.blur !== undefined) {
+        setBlurEnabled(updates.blur);
+        localStorage.setItem('chronozen-blur', JSON.stringify(updates.blur));
+    }
+    if (updates.spark !== undefined) {
+        setIsSparkEnabled(updates.spark);
+        localStorage.setItem('chronozen-spark', JSON.stringify(updates.spark));
+    }
+  };
+
+  const addSticker = () => {
+    if (newStickerUrl) {
+      setStickers([...stickers, { id: uuidv4(), url: newStickerUrl, x: 50, y: 50, size: 96 }]);
+      setNewStickerUrl('');
+    }
+  };
+
+  const updateSticker = (id: string, updates: Partial<Sticker>) => {
+    setStickers(stickers.map(s => s.id === id ? { ...s, ...updates } : s));
+  };
+
+  const removeSticker = (id: string) => setStickers(stickers.filter(s => s.id !== id));
 
   const pendingTodos = useMemo(() => todos.filter(t => !t.completed), [todos]);
   
@@ -658,16 +724,20 @@ export default function Home() {
     >
       {/* Stickers Overlay */}
       {stickers.map(sticker => (
-        <motion.div
+        <div
           key={sticker.id}
-          drag={isEditMode}
-          dragMomentum={false}
-          initial={{ x: sticker.x, y: sticker.y }}
-          className="absolute z-10 cursor-grab active:cursor-grabbing"
-          style={{ userSelect: 'none', position: 'absolute' }}
-          onDragEnd={(_, info) => updateSticker(sticker.id, { x: sticker.x + info.offset.x, y: sticker.y + info.offset.y })}
+          className="absolute z-10"
+          style={{ left: sticker.x, top: sticker.y }}
         >
-          <img src={sticker.url} alt="Sticker" draggable="false" style={{ width: sticker.size, height: sticker.size }} className="object-cover rounded-lg shadow-xl" />
+          <motion.div
+            drag={isEditMode}
+            dragMomentum={false}
+            className="cursor-grab active:cursor-grabbing"
+            style={{ userSelect: 'none', position: 'absolute' }}
+            onDragEnd={(_, info) => updateSticker(sticker.id, { x: sticker.x + info.offset.x, y: sticker.y + info.offset.y })}
+          >
+            <img src={sticker.url} alt="Sticker" draggable="false" style={{ width: sticker.size, height: sticker.size }} className="object-cover rounded-lg shadow-xl" />
+          </motion.div>
           {isEditMode && (
             <div className="absolute -top-12 -left-2 bg-background p-2 rounded shadow-lg z-20 w-32 space-y-2">
               <Slider value={[sticker.size]} min={48} max={256} step={8} onValueChange={([val]) => updateSticker(sticker.id, { size: val })} />
@@ -676,13 +746,10 @@ export default function Home() {
               </button>
             </div>
           )}
-        </motion.div>
+        </div>
       ))}
 
       <header className="absolute top-4 right-4 z-50 flex gap-2">
-        <Button variant="outline" size="icon" onClick={() => setIsEditMode(!isEditMode)}>
-          {isEditMode ? <Unlock className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
-        </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="icon">
@@ -692,7 +759,11 @@ export default function Home() {
           <DropdownMenuContent className="w-64 p-4 space-y-4" align="end">
             <DropdownMenuLabel>Settings & Stickers</DropdownMenuLabel>
             <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">Stickers</p>
+              <p className="text-xs text-muted-foreground">Sticker Controls</p>
+              <Button variant="outline" className="w-full justify-start" onClick={() => setIsEditMode(!isEditMode)}>
+                {isEditMode ? <Unlock className="mr-2 h-4 w-4" /> : <Lock className="mr-2 h-4 w-4" />}
+                {isEditMode ? 'Unlock Stickers' : 'Lock Stickers'}
+              </Button>
               <div className="flex gap-2">
                 <Input placeholder="Pinterest Image URL" value={newStickerUrl} onChange={(e) => setNewStickerUrl(e.target.value)} />
                 <Button size="icon" onClick={addSticker}><PlusCircle /></Button>
@@ -851,20 +922,24 @@ export default function Home() {
                 const file = e.target.files?.[0];
                 if (file) {
                     const reader = new FileReader();
-                    reader.onloadend = () => updateBackgroundSettings({ url: reader.result as string });
+                    reader.onloadend = () => updateSettings({ url: reader.result as string });
                     reader.readAsDataURL(file);
                 }
               }} />
             </div>
             <div className="space-y-2">
               <Label>From URL</Label>
-              <Input placeholder="Pinterest Image URL" value={background} onChange={(e) => updateBackgroundSettings({ url: e.target.value })} />
+              <Input placeholder="Pinterest Image URL" value={background} onChange={(e) => updateSettings({ url: e.target.value })} />
+            </div>
+            <div className="flex items-center justify-between">
+                <Label>Enable Click Sparks</Label>
+                <Switch checked={isSparkEnabled} onCheckedChange={(val) => updateSettings({ spark: val })} />
             </div>
             <div className="flex items-center justify-between">
                 <Label>Enable UI Blur</Label>
-                <Switch checked={blurEnabled} onCheckedChange={(val) => updateBackgroundSettings({ blur: val })} />
+                <Switch checked={blurEnabled} onCheckedChange={(val) => updateSettings({ blur: val })} />
             </div>
-            <Button variant="destructive" onClick={() => updateBackgroundSettings({ url: '' })} className="w-full">
+            <Button variant="destructive" onClick={() => updateSettings({ url: '' })} className="w-full">
               Remove Background
             </Button>
           </div>

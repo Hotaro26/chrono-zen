@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Play, Pause, RotateCcw, Settings, Briefcase, Flame, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Play, Pause, RotateCcw, Clock, Briefcase, Flame, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatTime } from '@/lib/utils';
 import { Badge } from './ui/badge';
@@ -76,7 +76,7 @@ const Pomodoro: React.FC<PomodoroProps> = ({
           <DialogTrigger asChild>
             <motion.div whileHover={{ scale: 1.1, rotate: 15 }} whileTap={{ scale: 0.95 }}>
               <Button variant="ghost" size="icon">
-                <Settings className="h-5 w-5" />
+                <Clock className="h-5 w-5" />
               </Button>
             </motion.div>
           </DialogTrigger>
