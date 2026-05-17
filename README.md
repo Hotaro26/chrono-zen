@@ -27,4 +27,5 @@
 ## Todo
 - fix the bug which stops it from deploying on vercel.
 - add colour scheme
-- add cute stickers 
+- add cute stickers
+- make responsive
