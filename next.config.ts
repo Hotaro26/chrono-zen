@@ -12,12 +12,7 @@ const withPWA = require("@ducanh2912/next-pwa").default({
 });
 
 const nextConfig = {
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  turbopack: {},
   images: {
     remotePatterns: [
       {
