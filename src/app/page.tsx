@@ -12,7 +12,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from "@/hooks/use-toast"
 import { motion, AnimatePresence } from 'framer-motion';
-import { getCongratsMessage } from '@/ai/flows/congrats-flow';
 import { Maximize, Minimize, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -118,9 +117,7 @@ export default function Home() {
           prev.map((t) => (t.id === id ? { ...t, completed: !todo.completed } : t))
         );
         if (!todo.completed) {
-            getCongratsMessage({ name: user?.email?.split('@')[0] || 'User' }).then((response) => {
-                toast({ title: 'Task Completed!', description: response.message });
-            });
+            toast({ title: 'Task Completed!', description: 'Great job!' });
         }
     }
   }, [todos, user, toast]);
