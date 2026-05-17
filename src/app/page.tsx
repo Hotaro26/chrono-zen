@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -8,65 +7,27 @@ import Pomodoro from '@/components/pomodoro';
 import Stopwatch from '@/components/stopwatch';
 import type { Todo, Sticker, CongratsMessageOutput } from '@/lib/types';
 import { motion, AnimatePresence, useDragControls } from 'framer-motion';
-import { Maximize, Minimize, Settings, Lock, Unlock, PlusCircle, Trash2 } from 'lucide-react';
+import { Maximize, Minimize, Settings, Lock, Unlock, PlusCircle, Trash2, Palette, Keyboard, BarChart3, Moon } from 'lucide-react';
+import { formatTime } from '@/lib/utils';
+import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from "@/hooks/use-toast"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { supabase } from '@/lib/supabase';
+import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
+import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
+import AuthModal from '@/components/auth-modal';
+import WelcomeModal from '@/components/welcome-modal';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 
-// ... (inside Home component)
-  // Sticker State
-  const [stickers, setStickers] = useState<Sticker[]>([]);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [newStickerUrl, setNewStickerUrl] = useState('');
-
-  const addSticker = () => {
-    if (newStickerUrl) {
-      setStickers([...stickers, { id: uuidv4(), url: newStickerUrl, x: 50, y: 50 }]);
-      setNewStickerUrl('');
-    }
-  };
-
-  const removeSticker = (id: string) => setStickers(stickers.filter(s => s.id !== id));
-
-  // ... (inside JSX)
-  return (
-    <div className="flex flex-col min-h-screen bg-background text-foreground font-body relative overflow-hidden">
-      {/* Stickers Overlay */}
-      {stickers.map(sticker => (
-        <motion.div
-          key={sticker.id}
-          drag={isEditMode}
-          dragMomentum={false}
-          className="absolute z-10 cursor-grab active:cursor-grabbing"
-          style={{ left: sticker.x, top: sticker.y }}
-        >
-          <img src={sticker.url} alt="Sticker" className="w-24 h-24 object-cover rounded-lg shadow-xl" />
-          {isEditMode && (
-            <button onClick={() => removeSticker(sticker.id)} className="absolute -top-2 -right-2 bg-destructive p-1 rounded-full text-white">
-              <Trash2 size={12} />
-            </button>
-          )}
-        </motion.div>
-      ))}
-
-      <header className="absolute top-4 right-4 z-50 flex gap-2">
-        <Button variant="outline" size="icon" onClick={() => setIsEditMode(!isEditMode)}>
-          {isEditMode ? <Unlock className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
-        </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon">
-              <Settings className="h-5 w-5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-64 p-4 space-y-4" align="end">
-            <DropdownMenuLabel>Settings & Stickers</DropdownMenuLabel>
-            <div className="flex gap-2">
-              <Input placeholder="Pinterest Image URL" value={newStickerUrl} onChange={(e) => setNewStickerUrl(e.target.value)} />
-              <Button size="icon" onClick={addSticker}><PlusCircle /></Button>
-            </div>
-            <DropdownMenuSeparator />
-            {/* ... rest of existing settings items */}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </header>
+const containerVariants = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { staggerChildren: 0.1, delayChildren: 0.2 } },
 };
@@ -94,6 +55,64 @@ export default function Home() {
   const [pomodoroTaskIndex, setPomodoroTaskIndex] = useState(-1);
   const [isAddTodoOpen, setAddTodoOpen] = useState(false);
 
+  // Sticker State
+  const [stickers, setStickers] = useState<Sticker[]>([]);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [newStickerUrl, setNewStickerUrl] = useState('');
+  
+  // Background State
+  const [background, setBackground] = useState<string>('');
+  const [dimness, setDimness] = useState<number>(50);
+  const [blurEnabled, setBlurEnabled] = useState<boolean>(false);
+  const [isBackgroundModalOpen, setIsBackgroundModalOpen] = useState(false);
+
+  useEffect(() => {
+    const savedBackground = localStorage.getItem('chronozen-background');
+    const savedDimness = localStorage.getItem('chronozen-dimness');
+    const savedBlur = localStorage.getItem('chronozen-blur');
+    if (savedBackground) setBackground(savedBackground);
+    if (savedDimness) setDimness(Number(savedDimness));
+    if (savedBlur !== null) setBlurEnabled(JSON.parse(savedBlur));
+  }, []);
+
+  const updateBackgroundSettings = (updates: Partial<{url: string, dim: number, blur: boolean}>) => {
+    if (updates.url !== undefined) {
+        setBackground(updates.url);
+        localStorage.setItem('chronozen-background', updates.url);
+    }
+    if (updates.dim !== undefined) {
+        setDimness(updates.dim);
+        localStorage.setItem('chronozen-dimness', String(updates.dim));
+    }
+    if (updates.blur !== undefined) {
+        setBlurEnabled(updates.blur);
+        localStorage.setItem('chronozen-blur', JSON.stringify(updates.blur));
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        updateBackgroundSettings({ url: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const addSticker = () => {
+    if (newStickerUrl) {
+      setStickers([...stickers, { id: uuidv4(), url: newStickerUrl, x: 50, y: 50, size: 96 }]);
+      setNewStickerUrl('');
+    }
+  };
+
+  const updateSticker = (id: string, updates: Partial<Sticker>) => {
+    setStickers(stickers.map(s => s.id === id ? { ...s, ...updates } : s));
+  };
+
+  const removeSticker = (id: string) => setStickers(stickers.filter(s => s.id !== id));
 
   // Pomodoro State
   const [pomodoroWorkMins, setPomodoroWorkMins] = useState(25);
@@ -631,21 +650,65 @@ export default function Home() {
   }, [activeTab, togglePomodoro, resetPomodoro, toggleStopwatch, resetStopwatch, toggleFullscreen]);
 
   return (
-    <div className="flex flex-col min-h-screen bg-background text-foreground font-body">
+    <div 
+      className="flex flex-col min-h-screen text-foreground font-body relative overflow-hidden"
+      style={{ 
+        background: background ? `url(${background}) center/cover no-repeat` : 'hsl(var(--background))' 
+      }}
+    >
+      {/* Stickers Overlay */}
+      {stickers.map(sticker => (
+        <motion.div
+          key={sticker.id}
+          drag={isEditMode}
+          dragMomentum={false}
+          initial={{ x: sticker.x, y: sticker.y }}
+          className="absolute z-10 cursor-grab active:cursor-grabbing"
+          style={{ userSelect: 'none', position: 'absolute' }}
+          onDragEnd={(_, info) => updateSticker(sticker.id, { x: sticker.x + info.offset.x, y: sticker.y + info.offset.y })}
+        >
+          <img src={sticker.url} alt="Sticker" draggable="false" style={{ width: sticker.size, height: sticker.size }} className="object-cover rounded-lg shadow-xl" />
+          {isEditMode && (
+            <div className="absolute -top-12 -left-2 bg-background p-2 rounded shadow-lg z-20 w-32 space-y-2">
+              <Slider value={[sticker.size]} min={48} max={256} step={8} onValueChange={([val]) => updateSticker(sticker.id, { size: val })} />
+              <button onClick={() => removeSticker(sticker.id)} className="absolute -top-3 -right-3 bg-destructive p-1 rounded-full text-white">
+                <Trash2 size={12} />
+              </button>
+            </div>
+          )}
+        </motion.div>
+      ))}
+
       <header className="absolute top-4 right-4 z-50 flex gap-2">
+        <Button variant="outline" size="icon" onClick={() => setIsEditMode(!isEditMode)}>
+          {isEditMode ? <Unlock className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
+        </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="icon">
               <Settings className="h-5 w-5" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56" align="end">
-            <DropdownMenuLabel>Settings</DropdownMenuLabel>
+          <DropdownMenuContent className="w-64 p-4 space-y-4" align="end">
+            <DropdownMenuLabel>Settings & Stickers</DropdownMenuLabel>
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">Stickers</p>
+              <div className="flex gap-2">
+                <Input placeholder="Pinterest Image URL" value={newStickerUrl} onChange={(e) => setNewStickerUrl(e.target.value)} />
+                <Button size="icon" onClick={addSticker}><PlusCircle /></Button>
+              </div>
+            </div>
+            <Button variant="outline" className="w-full" onClick={() => setIsBackgroundModalOpen(true)}>
+              <Palette className="mr-2 h-4 w-4" />
+              Customize Background
+            </Button>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => setIsShortcutsDialogOpen(true)}>
+              <Keyboard className="mr-2 h-4 w-4" />
               Keyboard Shortcuts
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setIsStatsDialogOpen(true)}>
+              <BarChart3 className="mr-2 h-4 w-4" />
               Statistics
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => {
@@ -653,6 +716,7 @@ export default function Home() {
               document.documentElement.classList.toggle('dark');
               localStorage.setItem('theme', theme);
             }}>
+              <Moon className="mr-2 h-4 w-4" />
               Toggle Theme
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -683,9 +747,12 @@ export default function Home() {
           initial="hidden"
           animate="visible"
         >
-          <motion.div className="w-full" variants={itemVariants}>
+          <motion.div 
+            className={`w-full rounded-xl overflow-hidden border border-border ${blurEnabled ? 'bg-background/20 backdrop-blur-md' : 'bg-transparent'}`} 
+            variants={itemVariants}
+          >
             <Tabs value={activeTab} className="w-full" onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-2 bg-muted">
+              <TabsList className="grid w-full grid-cols-2 bg-muted/50">
                 <TabsTrigger value="pomodoro">Pomodoro</TabsTrigger>
                 <TabsTrigger value="stopwatch">Stopwatch</TabsTrigger>
               </TabsList>
@@ -698,7 +765,7 @@ export default function Home() {
                   transition={{ duration: 0.2 }}
                 >
                   <TabsContent value="pomodoro" forceMount={true} className={activeTab !== 'pomodoro' ? 'hidden' : ''}>
-                      <Card className="bg-transparent border">
+                      <Card className="bg-transparent border-0 shadow-none">
                         <CardContent className="p-6">
                           <Pomodoro 
                             time={pomodoroTime}
@@ -721,7 +788,7 @@ export default function Home() {
                       </Card>
                   </TabsContent>
                   <TabsContent value="stopwatch" forceMount={true} className={activeTab !== 'stopwatch' ? 'hidden' : ''}>
-                      <Card className="bg-transparent border">
+                      <Card className="bg-transparent border-0 shadow-none">
                         <CardContent className="p-6">
                           <Stopwatch 
                             time={stopwatchTime}
@@ -736,7 +803,10 @@ export default function Home() {
               </AnimatePresence>
             </Tabs>
           </motion.div>
-          <motion.div className="w-full lg:row-span-2" variants={itemVariants}>
+          <motion.div 
+            className={`w-full lg:row-span-2 rounded-xl overflow-hidden border border-border ${blurEnabled ? 'bg-background/20 backdrop-blur-md' : 'bg-transparent'}`} 
+            variants={itemVariants}
+          >
             <TodoList
               todos={todos}
               onAddTodo={addTodo}
@@ -769,6 +839,37 @@ export default function Home() {
       </div>
       <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
       <WelcomeModal isOpen={isWelcomeModalOpen} onEnd={handleWelcomeEnd} />
+      <Dialog open={isBackgroundModalOpen} onOpenChange={setIsBackgroundModalOpen}>
+        <DialogContent className="bg-background/90 backdrop-blur-xl border-border">
+          <DialogHeader>
+            <DialogTitle>Customize Background</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            <div className="space-y-2">
+              <Label>From File</Label>
+              <Input type="file" accept="image/*" onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => updateBackgroundSettings({ url: reader.result as string });
+                    reader.readAsDataURL(file);
+                }
+              }} />
+            </div>
+            <div className="space-y-2">
+              <Label>From URL</Label>
+              <Input placeholder="Pinterest Image URL" value={background} onChange={(e) => updateBackgroundSettings({ url: e.target.value })} />
+            </div>
+            <div className="flex items-center justify-between">
+                <Label>Enable UI Blur</Label>
+                <Switch checked={blurEnabled} onCheckedChange={(val) => updateBackgroundSettings({ blur: val })} />
+            </div>
+            <Button variant="destructive" onClick={() => updateBackgroundSettings({ url: '' })} className="w-full">
+              Remove Background
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={isShortcutsDialogOpen} onOpenChange={setIsShortcutsDialogOpen}>
         <DialogContent className="bg-background/80 backdrop-blur-md">
           <DialogHeader>

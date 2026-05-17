@@ -11,6 +11,7 @@ export type Sticker = {
   url: string;
   x: number;
   y: number;
+  size: number;
 };
 
 export const CongratsMessageInputSchema = z.object({
