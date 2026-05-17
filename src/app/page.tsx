@@ -743,34 +743,40 @@ export default function Home() {
         </DialogContent>
       </Dialog>
       <Dialog open={isStatsDialogOpen} onOpenChange={setIsStatsDialogOpen}>
-        <DialogContent className="bg-background/80 backdrop-blur-md max-w-2xl">
+        <DialogContent className="bg-background/90 backdrop-blur-xl border-border max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Your Statistics</DialogTitle>
+            <DialogTitle className="text-2xl font-bold">Your Statistics</DialogTitle>
           </DialogHeader>
-          <div className="p-6">
-            <div className="grid grid-cols-2 gap-4 mb-8">
-              <Card className="p-4">
-                <p className="text-sm text-muted-foreground">Monthly Pomodoro Sessions</p>
-                <p className="text-2xl font-bold">{pomodoroSessions}</p>
-              </Card>
-              <Card className="p-4">
-                <p className="text-sm text-muted-foreground">Monthly Tasks Completed</p>
-                <p className="text-2xl font-bold">{todos.filter(t => t.completed).length}</p>
-              </Card>
+          <div className="py-6">
+            <div className="grid grid-cols-2 gap-6 mb-10">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Pomodoro Sessions</p>
+                <p className="text-4xl font-extrabold text-primary">{pomodoroSessions}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Tasks Completed</p>
+                <p className="text-4xl font-extrabold text-primary">{todos.filter(t => t.completed).length}</p>
+              </div>
             </div>
-            <div className="w-full h-64 overflow-hidden">
-              <p className="text-sm text-muted-foreground mb-4">Activity (Last 7 Days)</p>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={Array.from({ length: 7 }).map((_, i) => {
-                  const d = new Date();
-                  d.setDate(d.getDate() - (6 - i));
-                  return { name: d.toLocaleDateString('en-US', { weekday: 'short' }), val: Math.floor(Math.random() * 8) + 1 };
-                })}>
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <RechartsTooltip cursor={{fill: 'transparent'}} />
-                  <Bar dataKey="val" fill="hsl(var(--primary))" activeBar={false} />                </BarChart>
-              </ResponsiveContainer>
+            <div className="w-full h-64">
+              <p className="text-sm font-medium text-muted-foreground mb-6">Activity (Last 7 Days)</p>
+              <ChartContainer config={{}} className="h-full w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={Array.from({ length: 7 }).map((_, i) => {
+                    const d = new Date();
+                    d.setDate(d.getDate() - (6 - i));
+                    return { name: d.toLocaleDateString('en-US', { weekday: 'short' }), val: Math.floor(Math.random() * 8) + 1 };
+                  })}>
+                    <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
+                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}`} />
+                    <RechartsTooltip 
+                      cursor={{fill: 'hsl(var(--accent))', opacity: 0.5}} 
+                      content={<ChartTooltipContent hideLabel indicator="line" />}
+                    />
+                    <Bar dataKey="val" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
             </div>
           </div>
         </DialogContent>
