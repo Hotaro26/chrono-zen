@@ -3,7 +3,7 @@
 </p>
 
 # Chrono Zen
-## URL: https://chrono-timer-five.vercel.app/
+## URL: https://chrono-zen-three.vercel.app/
 ## Features:
 > 1. Adaptive theme for day/light mode
 > 2. has **pomodoro** and **stop** timer
