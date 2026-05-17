@@ -6,26 +6,67 @@ import { v4 as uuidv4 } from 'uuid';
 import TodoList from '@/components/todo-list';
 import Pomodoro from '@/components/pomodoro';
 import Stopwatch from '@/components/stopwatch';
-import type { Todo, CongratsMessageOutput } from '@/lib/types';
-import { formatTime } from '@/lib/utils';
-import { Card, CardContent } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useToast } from "@/hooks/use-toast"
-import { motion, AnimatePresence } from 'framer-motion';
-import { Maximize, Minimize, Settings } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { supabase } from '@/lib/supabase';
-import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
-import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
-import AuthModal from '@/components/auth-modal';
-import WelcomeModal from '@/components/welcome-modal';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import type { Todo, Sticker, CongratsMessageOutput } from '@/lib/types';
+import { motion, AnimatePresence, useDragControls } from 'framer-motion';
+import { Maximize, Minimize, Settings, Lock, Unlock, PlusCircle, Trash2 } from 'lucide-react';
 
+// ... (inside Home component)
+  // Sticker State
+  const [stickers, setStickers] = useState<Sticker[]>([]);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [newStickerUrl, setNewStickerUrl] = useState('');
 
-const containerVariants = {
+  const addSticker = () => {
+    if (newStickerUrl) {
+      setStickers([...stickers, { id: uuidv4(), url: newStickerUrl, x: 50, y: 50 }]);
+      setNewStickerUrl('');
+    }
+  };
+
+  const removeSticker = (id: string) => setStickers(stickers.filter(s => s.id !== id));
+
+  // ... (inside JSX)
+  return (
+    <div className="flex flex-col min-h-screen bg-background text-foreground font-body relative overflow-hidden">
+      {/* Stickers Overlay */}
+      {stickers.map(sticker => (
+        <motion.div
+          key={sticker.id}
+          drag={isEditMode}
+          dragMomentum={false}
+          className="absolute z-10 cursor-grab active:cursor-grabbing"
+          style={{ left: sticker.x, top: sticker.y }}
+        >
+          <img src={sticker.url} alt="Sticker" className="w-24 h-24 object-cover rounded-lg shadow-xl" />
+          {isEditMode && (
+            <button onClick={() => removeSticker(sticker.id)} className="absolute -top-2 -right-2 bg-destructive p-1 rounded-full text-white">
+              <Trash2 size={12} />
+            </button>
+          )}
+        </motion.div>
+      ))}
+
+      <header className="absolute top-4 right-4 z-50 flex gap-2">
+        <Button variant="outline" size="icon" onClick={() => setIsEditMode(!isEditMode)}>
+          {isEditMode ? <Unlock className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="icon">
+              <Settings className="h-5 w-5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-64 p-4 space-y-4" align="end">
+            <DropdownMenuLabel>Settings & Stickers</DropdownMenuLabel>
+            <div className="flex gap-2">
+              <Input placeholder="Pinterest Image URL" value={newStickerUrl} onChange={(e) => setNewStickerUrl(e.target.value)} />
+              <Button size="icon" onClick={addSticker}><PlusCircle /></Button>
+            </div>
+            <DropdownMenuSeparator />
+            {/* ... rest of existing settings items */}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </header>
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { staggerChildren: 0.1, delayChildren: 0.2 } },
 };

@@ -6,6 +6,13 @@ export type Todo = {
   completed: boolean;
 };
 
+export type Sticker = {
+  id: string;
+  url: string;
+  x: number;
+  y: number;
+};
+
 export const CongratsMessageInputSchema = z.object({
   name: z.string().describe('The name of the user to congratulate.'),
 });
