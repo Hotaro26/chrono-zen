@@ -24,9 +24,13 @@
 <img width="1708" height="1000" alt="rounded dark" src="https://github.com/user-attachments/assets/1f4159c5-332f-4dcb-9df8-f21cebc0438d" />
 <img width="1712" height="1010" alt="roundedwhite" src="https://github.com/user-attachments/assets/93a44aaa-09da-45a7-a403-ca1d6bd2a62d" />
 
-## Todo
-- fix the bug which stops it from deploying on vercel.
-- add colour scheme
-- add cute stickers
-- make responsive
-Triggering redeploy
+## Todos
+✅ fix the bug which stops it from deploying on vercel.
+
+✅ add authentication 
+
+✅ add cute stickers
+
+[ ] add colour scheme 
+
+✅ make it responsive
