@@ -57,10 +57,12 @@ export default function Home() {
   const [pomodoroTaskIndex, setPomodoroTaskIndex] = useState(-1);
   const [isAddTodoOpen, setAddTodoOpen] = useState(false);
 
-  // Sticker State
   const [stickers, setStickers] = useState<Sticker[]>([]);
   const [isEditMode, setIsEditMode] = useState(false);
   const [newStickerUrl, setNewStickerUrl] = useState('');
+  
+  // App Loading State
+  const [isLoading, setIsLoading] = useState(true);
 
   // Background State
   const [background, setBackground] = useState<string>('');
@@ -186,6 +188,39 @@ export default function Home() {
         console.error("Failed to parse local todos");
       }
     }
+
+    // Preload Backgrounds
+    const loadAssets = async () => {
+      try {
+        const res = await fetch('/api/backgrounds');
+        const bgs = await res.json();
+        
+        const imagePromises = bgs.map((src: string) => {
+          return new Promise((resolve) => {
+            const img = new window.Image();
+            img.src = src;
+            img.onload = resolve;
+            img.onerror = resolve;
+          });
+        });
+        
+        if (savedBackground && !bgs.includes(savedBackground)) {
+           imagePromises.push(new Promise((resolve) => {
+             const img = new window.Image();
+             img.src = savedBackground;
+             img.onload = resolve;
+             img.onerror = resolve;
+           }));
+        }
+        
+        await Promise.all(imagePromises);
+      } catch(e) {
+        console.error('Failed to preload images', e);
+      }
+      setTimeout(() => setIsLoading(false), 500); // slight delay for smooth transition
+    };
+    
+    loadAssets();
 
     const hasTakenTour = localStorage.getItem('chronozen-tour-taken');
     if (!hasTakenTour) {
@@ -729,11 +764,25 @@ export default function Home() {
 
   return (
     <div 
-      className="flex flex-col min-h-screen text-foreground font-body relative overflow-hidden"
+      className={`min-h-screen flex flex-col relative transition-colors duration-500 overflow-x-hidden ${isEditMode ? 'ring-4 ring-primary ring-inset' : ''}`}
       style={{ 
         background: background ? `url(${background}) center/cover no-repeat` : 'hsl(var(--background))' 
       }}
     >
+      <AnimatePresence>
+        {isLoading && (
+          <motion.div 
+            key="loading-screen"
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.8, ease: "easeInOut" }}
+            className="fixed inset-0 z-[100] bg-background flex flex-col items-center justify-center"
+          >
+            <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+            <h2 className="mt-8 text-2xl font-semibold tracking-tight animate-pulse text-foreground">Loading ChronoZen...</h2>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* Stickers Overlay */}
       {stickers.map(sticker => (
         <div
@@ -829,13 +878,13 @@ export default function Home() {
       </header>
       <main className="flex-grow p-4 md:p-8 flex items-center justify-center">
         <motion.div 
-          className="w-full max-w-4xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8"
+          className="w-full mx-auto flex flex-col lg:flex-row items-center lg:items-stretch justify-center gap-6 lg:gap-8"
           variants={containerVariants}
           initial="hidden"
           animate="visible"
         >
           <motion.div 
-            className={`w-full rounded-xl overflow-hidden border border-border ${blurEnabled ? 'bg-card/70 backdrop-blur-2xl shadow-xl' : 'bg-card shadow-lg'}`} 
+            className={`w-full max-w-md flex flex-col rounded-xl overflow-hidden border border-border ${blurEnabled ? 'bg-card/70 backdrop-blur-2xl shadow-xl' : 'bg-card shadow-lg'}`} 
             style={{ backgroundColor: !blurEnabled && cardColor ? cardColor : undefined }}
             variants={itemVariants}
           >
@@ -892,7 +941,7 @@ export default function Home() {
             </Tabs>
           </motion.div>
           <motion.div 
-            className={`w-full lg:row-span-2 flex flex-col h-[600px] max-h-[80vh] rounded-xl overflow-hidden border border-border ${blurEnabled ? 'bg-card/70 backdrop-blur-2xl shadow-xl' : 'bg-card shadow-lg'}`} 
+            className={`w-full max-w-md flex flex-col h-[600px] max-h-[80vh] rounded-xl overflow-hidden border border-border ${blurEnabled ? 'bg-card/70 backdrop-blur-2xl shadow-xl' : 'bg-card shadow-lg'}`} 
             style={{ backgroundColor: !blurEnabled && cardColor ? cardColor : undefined }}
             variants={itemVariants}
           >

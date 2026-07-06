@@ -147,10 +147,10 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onEnd, onSetBackgro
               {backgrounds.length > 0 ? (
                 <div className="w-full">
                   <div className="relative group">
-                    <div className="overflow-hidden" ref={emblaRef}>
-                      <div className="flex touch-pan-y h-56 -ml-4">
+                    <div className="overflow-hidden rounded-xl" ref={emblaRef}>
+                      <div className="flex touch-pan-y h-56">
                         {backgrounds.map((bg, idx) => (
-                          <div key={bg} className="flex-[0_0_85%] min-w-0 relative pl-4 cursor-pointer" onClick={() => { handleApplyBackground(bg); emblaApi?.scrollTo(idx); }}>
+                          <div key={bg} className="flex-[0_0_85%] min-w-0 relative px-2 cursor-pointer" onClick={() => { handleApplyBackground(bg); emblaApi?.scrollTo(idx); }}>
                             <div className={`w-full h-full relative transition-all duration-500 ease-out ${idx === selectedIndex ? 'scale-100 opacity-100' : 'scale-[0.85] opacity-50 hover:opacity-75'}`}>
                               <img src={bg} alt="Background" className={`w-full h-full object-cover rounded-2xl shadow-xl border-2 transition-colors duration-300 ${idx === selectedIndex ? 'border-primary ring-4 ring-primary/20 ring-offset-2 ring-offset-background' : 'border-transparent'}`} />
                               {idx === selectedIndex && (
