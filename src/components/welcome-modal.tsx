@@ -97,7 +97,7 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onEnd, onSetBackgro
 
   return (
     <Dialog open={isOpen} onOpenChange={onEnd}>
-      <DialogContent className="bg-background/80 backdrop-blur-md max-w-lg" onInteractOutside={(e) => e.preventDefault()}>
+      <DialogContent className="bg-background/80 backdrop-blur-md max-w-lg overflow-x-hidden" onInteractOutside={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>
             {step === 1 ? 'Welcome to ChronoZen!' : step === 2 ? 'Choose your Vibe' : step === 3 ? 'Choose UI Style' : 'Pick a Theme Color'}
@@ -145,10 +145,10 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onEnd, onSetBackgro
               exit={{ opacity: 0, x: 20 }}
             >
               {backgrounds.length > 0 ? (
-                <div className="w-full">
-                  <div className="relative group">
-                    <div className="overflow-hidden rounded-xl" ref={emblaRef}>
-                      <div className="flex touch-pan-y h-56">
+                <div className="w-full min-w-0">
+                  <div className="relative group min-w-0 w-full">
+                    <div className="overflow-hidden rounded-xl min-w-0 w-full" ref={emblaRef}>
+                      <div className="flex touch-pan-y h-56 w-full min-w-0">
                         {backgrounds.map((bg, idx) => (
                           <div key={bg} className="flex-[0_0_85%] min-w-0 relative px-2 cursor-pointer" onClick={() => { handleApplyBackground(bg); emblaApi?.scrollTo(idx); }}>
                             <div className={`w-full h-full relative transition-all duration-500 ease-out ${idx === selectedIndex ? 'scale-100 opacity-100' : 'scale-[0.85] opacity-50 hover:opacity-75'}`}>
