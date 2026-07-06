@@ -78,10 +78,22 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onEnd, onSetBackgro
 
   const handleApplyBackground = (url: string) => {
     onSetBackground(url);
+    autoplayPlugin.current.stop();
   };
 
-  const scrollPrev = useCallback(() => { if (emblaApi) emblaApi.scrollPrev(); }, [emblaApi]);
-  const scrollNext = useCallback(() => { if (emblaApi) emblaApi.scrollNext(); }, [emblaApi]);
+  const scrollPrev = useCallback(() => { 
+    if (emblaApi) {
+      emblaApi.scrollPrev(); 
+      autoplayPlugin.current.stop();
+    }
+  }, [emblaApi]);
+  
+  const scrollNext = useCallback(() => { 
+    if (emblaApi) {
+      emblaApi.scrollNext(); 
+      autoplayPlugin.current.stop();
+    }
+  }, [emblaApi]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onEnd}>

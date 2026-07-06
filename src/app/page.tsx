@@ -892,7 +892,7 @@ export default function Home() {
             </Tabs>
           </motion.div>
           <motion.div 
-            className={`w-full lg:row-span-2 rounded-xl overflow-hidden border border-border ${blurEnabled ? 'bg-card/70 backdrop-blur-2xl shadow-xl' : 'bg-card shadow-lg'}`} 
+            className={`w-full lg:row-span-2 flex flex-col h-[600px] max-h-[80vh] rounded-xl overflow-hidden border border-border ${blurEnabled ? 'bg-card/70 backdrop-blur-2xl shadow-xl' : 'bg-card shadow-lg'}`} 
             style={{ backgroundColor: !blurEnabled && cardColor ? cardColor : undefined }}
             variants={itemVariants}
           >
