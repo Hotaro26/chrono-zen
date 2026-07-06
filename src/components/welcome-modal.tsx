@@ -139,7 +139,7 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onEnd, onSetBackgro
           {step === 2 && (
             <motion.div
               key="step2"
-              className="py-6"
+              className="py-6 min-w-0 w-full"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
@@ -199,7 +199,7 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onEnd, onSetBackgro
           {step === 3 && (
             <motion.div
               key="step3"
-              className="py-6 space-y-4"
+              className="py-6 space-y-4 min-w-0 w-full"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
@@ -247,7 +247,7 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onEnd, onSetBackgro
           {step === 4 && (
             <motion.div
               key="step4"
-              className="py-6 space-y-6"
+              className="py-6 space-y-6 min-w-0 w-full"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
