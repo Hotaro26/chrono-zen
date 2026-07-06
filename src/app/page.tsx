@@ -7,7 +7,7 @@ import Pomodoro from '@/components/pomodoro';
 import Stopwatch from '@/components/stopwatch';
 import type { Todo, Sticker } from '@/lib/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Maximize, Minimize, Settings, Lock, Unlock, PlusCircle, Trash2, Palette, Keyboard, BarChart3, Moon, Clock } from 'lucide-react';
+import { Maximize, Minimize, Settings, Lock, Unlock, PlusCircle, Trash2, Palette, Keyboard, BarChart3, Moon, Clock, Activity, CheckCircle2, Timer } from 'lucide-react';
 import { formatTime } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/lib/supabase';
-import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area, CartesianGrid } from 'recharts';
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 import AuthModal from '@/components/auth-modal';
 import WelcomeModal from '@/components/welcome-modal';
@@ -66,15 +66,16 @@ export default function Home() {
   const [background, setBackground] = useState<string>('');
   const [dimness, setDimness] = useState<number>(50);
   const [blurEnabled, setBlurEnabled] = useState<boolean>(false);
-  const [isSparkEnabled, setIsSparkEnabled] = useState<boolean>(true);
   const [isBackgroundModalOpen, setIsBackgroundModalOpen] = useState(false);
 
   // Pomodoro State
   const [pomodoroWorkMins, setPomodoroWorkMins] = useState(25);
   const [pomodoroBreakMins, setPomodoroBreakMins] = useState(5);
+  const [isSparkEnabled, setIsSparkEnabled] = useState(true);
+  const [cardColor, setCardColor] = useState<string>('');
   const [pomodoroWorkTitle, setPomodoroWorkTitle] = useState('Work');
   const [pomodoroBreakTitle, setPomodoroBreakTitle] = useState('Break');
-  const [pomodoroTime, setPomodoroTime] = useState(pomodoroWorkMins * 60);
+  const [pomodoroTime, setPomodoroTime] = useState(25 * 60);
   const [pomodoroRunning, setPomodoroRunning] = useState(false);
   const [pomodoroMode, setPomodoroMode] = useState<'work' | 'break'>('work');
   const [pomodoroSessions, setPomodoroSessions] = useState(0);
@@ -170,28 +171,56 @@ export default function Home() {
     const savedDimness = localStorage.getItem('chronozen-dimness');
     const savedBlur = localStorage.getItem('chronozen-blur');
     const savedSpark = localStorage.getItem('chronozen-spark');
+    const savedColor = localStorage.getItem('chronozen-card-color');
+    const savedTodos = localStorage.getItem('chronozen-todos');
+    
     if (savedBackground) setBackground(savedBackground);
     if (savedDimness) setDimness(Number(savedDimness));
     if (savedBlur !== null) setBlurEnabled(JSON.parse(savedBlur));
     if (savedSpark !== null) setIsSparkEnabled(JSON.parse(savedSpark));
+    if (savedColor) setCardColor(savedColor);
+    if (savedTodos) {
+      try {
+        setTodos(JSON.parse(savedTodos));
+      } catch (e) {
+        console.error("Failed to parse local todos");
+      }
+    }
+
+    const hasTakenTour = localStorage.getItem('chronozen-tour-taken');
+    if (!hasTakenTour) {
+      setIsWelcomeModalOpen(true);
+    }
   }, []);
 
-  const updateSettings = (updates: Partial<{url: string, dim: number, blur: boolean, spark: boolean}>) => {
+  const updateSettings = (updates: Partial<{url: string, dim: number, blur: boolean, spark: boolean, color: string}>) => {
     if (updates.url !== undefined) {
-        setBackground(updates.url);
+      setBackground(updates.url);
+      if (updates.url === '') {
+        localStorage.removeItem('chronozen-background');
+      } else {
         localStorage.setItem('chronozen-background', updates.url);
+      }
     }
     if (updates.dim !== undefined) {
-        setDimness(updates.dim);
-        localStorage.setItem('chronozen-dimness', String(updates.dim));
+      setDimness(updates.dim);
+      localStorage.setItem('chronozen-dimness', updates.dim.toString());
     }
     if (updates.blur !== undefined) {
-        setBlurEnabled(updates.blur);
-        localStorage.setItem('chronozen-blur', JSON.stringify(updates.blur));
+      setBlurEnabled(updates.blur);
+      localStorage.setItem('chronozen-blur', JSON.stringify(updates.blur));
     }
     if (updates.spark !== undefined) {
-        setIsSparkEnabled(updates.spark);
-        localStorage.setItem('chronozen-spark', JSON.stringify(updates.spark));
+      setIsSparkEnabled(updates.spark);
+      localStorage.setItem('chronozen-spark', JSON.stringify(updates.spark));
+    }
+    if (updates.color !== undefined) {
+      setCardColor(updates.color);
+      if (updates.color === '') {
+        localStorage.removeItem('chronozen-card-color');
+      } else {
+        localStorage.setItem('chronozen-card-color', updates.color);
+      }
     }
   };
 
@@ -217,51 +246,34 @@ export default function Home() {
   }, [pendingTodos.length, pomodoroTaskIndex]);
   
   const addTodo = useCallback(async (text: string) => {
-    if (!user) return;
-    const { data, error } = await supabase
-        .from('todos')
-        .insert([{ user_id: user.id, text, completed: false }])
-        .select()
-        .single();
-    
-    if (data) setTodos((prev) => [...prev, data]);
-    if (error) console.error('Error adding todo:', error);
-  }, [user]);
+    const newTodo = { id: uuidv4(), user_id: 'local', text, completed: false, created_at: new Date().toISOString() };
+    setTodos((prev) => [...prev, newTodo as any]);
+  }, []);
 
   const toggleTodo = useCallback(async (id: string) => {
-    if (!user) return;
-    const todo = todos.find(t => t.id === id);
-    if (!todo) return;
-
-    const { error } = await supabase
-        .from('todos')
-        .update({ completed: !todo.completed })
-        .eq('id', id);
-    
-    if (!error) {
-        setTodos((prev) =>
-          prev.map((t) => (t.id === id ? { ...t, completed: !todo.completed } : t))
-        );
-        if (!todo.completed) {
+    setTodos((prev) =>
+      prev.map((t) => {
+        if (t.id === id) {
+          const completed = !t.completed;
+          if (completed) {
             toast({ title: 'Task Completed!', description: 'Great job!' });
+            return { ...t, completed, completed_at: new Date().toISOString() };
+          }
+          return { ...t, completed, completed_at: undefined };
         }
-    }
-  }, [todos, user, toast]);
+        return t;
+      })
+    );
+  }, [toast]);
 
   const deleteTodo = useCallback(async (id: string) => {
-    const { error } = await supabase.from('todos').delete().eq('id', id);
-    if (!error) {
-        setTodos((prev) => prev.filter((todo) => todo.id !== id));
-    }
+    setTodos((prev) => prev.filter((todo) => todo.id !== id));
   }, []);
 
   const editTodo = useCallback(async (id: string, newText: string) => {
-    const { error } = await supabase.from('todos').update({ text: newText }).eq('id', id);
-    if (!error) {
-        setTodos((prev) =>
-          prev.map((todo) => (todo.id === id ? { ...todo, text: newText } : todo))
-        );
-    }
+    setTodos((prev) =>
+      prev.map((todo) => (todo.id === id ? { ...todo, text: newText } : todo))
+    );
   }, []);
 
   // Sync profile data to Supabase when it changes
@@ -773,6 +785,10 @@ export default function Home() {
               <Palette className="mr-2 h-4 w-4" />
               Customize Background
             </Button>
+            <Button variant="outline" className="w-full mt-2" onClick={() => setIsWelcomeModalOpen(true)}>
+              <Palette className="mr-2 h-4 w-4" />
+              Run Onboarding Setup
+            </Button>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => setIsShortcutsDialogOpen(true)}>
               <Keyboard className="mr-2 h-4 w-4" />
@@ -819,7 +835,8 @@ export default function Home() {
           animate="visible"
         >
           <motion.div 
-            className={`w-full rounded-xl overflow-hidden border border-border ${blurEnabled ? 'bg-background/20 backdrop-blur-md' : 'bg-transparent'}`} 
+            className={`w-full rounded-xl overflow-hidden border border-border ${blurEnabled ? 'bg-card/70 backdrop-blur-2xl shadow-xl' : 'bg-card shadow-lg'}`} 
+            style={{ backgroundColor: !blurEnabled && cardColor ? cardColor : undefined }}
             variants={itemVariants}
           >
             <Tabs value={activeTab} className="w-full" onValueChange={setActiveTab}>
@@ -875,7 +892,8 @@ export default function Home() {
             </Tabs>
           </motion.div>
           <motion.div 
-            className={`w-full lg:row-span-2 rounded-xl overflow-hidden border border-border ${blurEnabled ? 'bg-background/20 backdrop-blur-md' : 'bg-transparent'}`} 
+            className={`w-full lg:row-span-2 rounded-xl overflow-hidden border border-border ${blurEnabled ? 'bg-card/70 backdrop-blur-2xl shadow-xl' : 'bg-card shadow-lg'}`} 
+            style={{ backgroundColor: !blurEnabled && cardColor ? cardColor : undefined }}
             variants={itemVariants}
           >
             <TodoList
@@ -909,7 +927,7 @@ export default function Home() {
         </TooltipProvider>
       </div>
       <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
-      <WelcomeModal isOpen={isWelcomeModalOpen} onEnd={handleWelcomeEnd} />
+      <WelcomeModal isOpen={isWelcomeModalOpen} onEnd={handleWelcomeEnd} onSetBackground={(url: string) => updateSettings({ url })} onSetBlur={(blur: boolean) => updateSettings({ blur })} onSetColor={(color: string) => updateSettings({ color })} initialBlur={blurEnabled} initialColor={cardColor} />
       <Dialog open={isBackgroundModalOpen} onOpenChange={setIsBackgroundModalOpen}>
         <DialogContent className="bg-background/90 backdrop-blur-xl border-border">
           <DialogHeader>
@@ -964,34 +982,59 @@ export default function Home() {
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold">Your Statistics</DialogTitle>
           </DialogHeader>
-          <div className="py-6">
-            <div className="grid grid-cols-2 gap-6 mb-10">
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Pomodoro Sessions</p>
-                <p className="text-4xl font-extrabold text-primary">{pomodoroSessions}</p>
+          <div className="py-6 space-y-8">
+            <div className="grid grid-cols-2 gap-6">
+              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/10 to-transparent border border-primary/20 p-6 flex flex-col items-center justify-center space-y-2 group shadow-[0_0_15px_rgba(var(--primary),0.1)]">
+                <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <Timer className="h-8 w-8 text-primary mb-2 opacity-80" />
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Pomodoro Sessions</p>
+                <p className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-br from-primary to-primary/50 drop-shadow-sm">{pomodoroSessions}</p>
               </div>
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Tasks Completed</p>
-                <p className="text-4xl font-extrabold text-primary">{todos.filter(t => t.completed).length}</p>
+              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-bl from-primary/10 to-transparent border border-primary/20 p-6 flex flex-col items-center justify-center space-y-2 group shadow-[0_0_15px_rgba(var(--primary),0.1)]">
+                <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <CheckCircle2 className="h-8 w-8 text-primary mb-2 opacity-80" />
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Tasks Completed</p>
+                <p className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-bl from-primary to-primary/50 drop-shadow-sm">{todos.filter(t => t.completed).length}</p>
               </div>
             </div>
-            <div className="w-full h-64">
-              <p className="text-sm font-medium text-muted-foreground mb-6">Activity (Last 7 Days)</p>
-              <ChartContainer config={{}} className="h-full w-full">
+            <div className="w-full h-72 p-6 rounded-2xl border border-border bg-card/30 backdrop-blur-sm relative">
+              <div className="flex items-center space-x-2 mb-6">
+                <Activity className="h-5 w-5 text-primary" />
+                <p className="text-sm font-bold text-foreground uppercase tracking-wider">Activity (Last 7 Days)</p>
+              </div>
+              <ChartContainer config={{}} className="h-[calc(100%-2rem)] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={Array.from({ length: 7 }).map((_, i) => {
+                  <AreaChart data={Array.from({ length: 7 }).map((_, i) => {
                     const d = new Date();
                     d.setDate(d.getDate() - (6 - i));
-                    return { name: d.toLocaleDateString('en-US', { weekday: 'short' }), val: Math.floor(Math.random() * 8) + 1 };
-                  })}>
-                    <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
+                    d.setHours(0, 0, 0, 0);
+                    const start = d.getTime();
+                    const end = start + 86400000;
+                    
+                    const val = todos.filter(t => 
+                      t.completed && 
+                      t.completed_at && 
+                      new Date(t.completed_at).getTime() >= start && 
+                      new Date(t.completed_at).getTime() < end
+                    ).length;
+
+                    return { name: d.toLocaleDateString('en-US', { weekday: 'short' }), val };
+                  })} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.6}/>
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted-foreground))" opacity={0.2} />
+                    <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} dy={10} />
                     <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}`} />
                     <RechartsTooltip 
-                      cursor={{fill: 'hsl(var(--accent))', opacity: 0.5}} 
+                      cursor={{stroke: 'hsl(var(--primary))', strokeWidth: 1, strokeDasharray: '4 4'}} 
                       content={<ChartTooltipContent hideLabel indicator="line" />}
                     />
-                    <Bar dataKey="val" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                  </BarChart>
+                    <Area type="monotone" dataKey="val" stroke="hsl(var(--primary))" strokeWidth={3} fillOpacity={1} fill="url(#colorVal)" />
+                  </AreaChart>
                 </ResponsiveContainer>
               </ChartContainer>
             </div>

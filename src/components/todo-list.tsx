@@ -109,7 +109,7 @@ const TodoList: React.FC<TodoListProps> = ({ todos, onAddTodo, onToggleTodo, onD
   };
 
   return (
-    <Card className="bg-transparent border h-full flex flex-col">
+    <Card className="bg-transparent border-0 rounded-none shadow-none h-full flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-primary">To-Do List</CardTitle>
         <Dialog open={isAddTodoOpen} onOpenChange={setAddTodoOpen}>
