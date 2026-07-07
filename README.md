@@ -31,6 +31,6 @@
 
 ✅ add cute stickers
 
-[ ] add colour scheme 
+~[ ] add colour scheme~
 
 ✅ make it responsive
